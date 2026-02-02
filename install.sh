@@ -59,6 +59,13 @@ install_packages() {
     elif command -v pacman >/dev/null 2>&1; then
         echo "Detected pacman. Installing packages..."
         sudo pacman -S --noconfirm starship zoxide eza bat fzf fastfetch
+    elif command -v conda >/dev/null 2>&1; then
+        echo "Detected Conda. Installing packages..."
+        conda install -y -c conda-forge starship zoxide bat fzf eza
+        # Fastfetch might not be in standard conda channels, try to install or skip
+        if ! command -v fastfetch &> /dev/null; then
+             echo "fastfetch not found in conda, skipping or install manually."
+        fi
     else
         echo "No supported package manager found. Attempting manual installs for supported tools..."
 

@@ -84,7 +84,17 @@ install_packages() {
     elif command -v apt-get >/dev/null 2>&1; then
         echo "Detected apt-get. Installing packages..."
         sudo apt-get update
-        sudo apt-get install -y zoxide fzf bat fastfetch 2>/dev/null || sudo apt-get install -y zoxide fzf batcat
+
+        # Try to install eza via official repo if not already available
+        if ! command -v eza &> /dev/null; then
+            echo "Setting up eza community repository..."
+            sudo mkdir -p /etc/apt/keyrings
+            wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | sudo gpg --dearmor --yes -o /etc/apt/keyrings/gierdot.gpg
+            echo "deb [signed-by=/etc/apt/keyrings/gierdot.gpg] http://deb.gierdot.net/ stable main" | sudo tee /etc/apt/sources.list.d/gierdot.list
+            sudo apt-get update
+        fi
+
+        sudo apt-get install -y zoxide fzf bat fastfetch eza 2>/dev/null || sudo apt-get install -y zoxide fzf batcat
 
         # starship recommendation for linux is script
         if ! command -v starship &> /dev/null; then

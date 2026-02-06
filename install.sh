@@ -7,6 +7,20 @@ STARSHIP_CONFIG="$HOME/.config/starship.toml"
 
 echo "Setting up Zsh configuration..."
 
+# --- Utility Functions ---
+
+backup_if_exists() {
+    local target="$1"
+    if [ -e "$target" ] || [ -L "$target" ]; then
+        local timestamp=$(date +%Y%m%d_%H%M%S)
+        local backup="${target}.${timestamp}.bak"
+        echo "Backing up existing $(basename "$target") to $(basename "$backup")..."
+        mv "$target" "$backup"
+    fi
+}
+
+# --- Core Setup ---
+
 # 0. Check and install Zsh if not found
 check_and_install_zsh() {
     if ! command -v zsh >/dev/null 2>&1; then
@@ -64,32 +78,39 @@ install_zap() {
 }
 
 install_packages() {
-    PACKAGES="starship zoxide fzf bat"
-    # Note: 'eza' and 'fastfetch' might need special handling on some distros, trying widely available names
-    # mapped names: bat -> batcat (ubuntu), fzf -> fzf, zoxide -> zoxide, starship -> starship
-
     if command -v brew >/dev/null 2>&1; then
         echo "Detected Homebrew. Installing packages..."
         brew install starship zoxide eza bat fzf fastfetch
     elif command -v apt-get >/dev/null 2>&1; then
         echo "Detected apt-get. Installing packages..."
         sudo apt-get update
-        sudo apt-get install -y zoxide fzf bat
+        sudo apt-get install -y zoxide fzf bat fastfetch 2>/dev/null || sudo apt-get install -y zoxide fzf batcat
+
         # starship recommendation for linux is script
         if ! command -v starship &> /dev/null; then
              curl -sS https://starship.rs/install.sh | sh -s -- -y
         fi
-        # eza/fastfetch usually require adding repos on older ubuntu, skipping for basic fallback or using cargo if available
+
+        # Cargo fallback for eza
         if command -v cargo >/dev/null 2>&1; then
-            echo "Installing eza/fastfetch via cargo..."
-            cargo install eza fastfetch
+            echo "Installing eza via cargo..."
+            rustc_version=$(rustc --version | awk '{print $2}')
+            # Need 1.82.0+ for latest eza
+            if [[ "$rustc_version" < "1.82.0" ]]; then
+                echo "rustc version $rustc_version is older than 1.82.0. Installing eza 0.20.18..."
+                cargo install eza --version 0.20.18
+            else
+                cargo install eza
+            fi
         else
-            echo "Cargo not found. Skipping eza/fastfetch. Please install manually."
+            echo "Cargo not found. Skipping eza. Please install manually."
         fi
 
-        # fix bat command name on ubuntu
-        mkdir -p ~/.local/bin
-        ln -sf /usr/bin/batcat ~/.local/bin/bat
+        # fix bat command name on ubuntu if installed as batcat
+        if command -v batcat >/dev/null 2>&1 && ! command -v bat >/dev/null 2>&1; then
+            mkdir -p ~/.local/bin
+            ln -sf /usr/bin/batcat ~/.local/bin/bat
+        fi
 
     elif command -v dnf >/dev/null 2>&1; then
         echo "Detected dnf. Installing packages..."
@@ -100,24 +121,16 @@ install_packages() {
     elif command -v conda >/dev/null 2>&1; then
         echo "Detected Conda. Installing packages..."
         conda install -y -c conda-forge starship zoxide bat fzf eza
-        # Fastfetch might not be in standard conda channels, try to install or skip
-        if ! command -v fastfetch &> /dev/null; then
-             echo "fastfetch not found in conda, skipping or install manually."
-        fi
     else
-        echo "No supported package manager found. Attempting manual installs for supported tools..."
-
+        echo "No supported package manager found. Attempting manual installs..."
         # Starship
         if ! command -v starship &> /dev/null; then
              curl -sS https://starship.rs/install.sh | sh -s -- -y
         fi
-
         # Zoxide
         if ! command -v zoxide &> /dev/null; then
             curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
         fi
-
-        echo "Please install eza, bat, fzf, and fastfetch manually for your OS."
     fi
 }
 
@@ -128,18 +141,12 @@ install_packages
 echo "Symlinking configuration..."
 
 # .zshrc
-if [ -f "$ZSHRC" ] && [ ! -L "$ZSHRC" ]; then
-    echo "Backing up existing .zshrc..."
-    mv "$ZSHRC" "${ZSHRC}.bak"
-fi
+backup_if_exists "$ZSHRC"
 ln -sf "$REPO_DIR/.zshrc" "$ZSHRC"
 
 # starship.toml
 mkdir -p "$(dirname "$STARSHIP_CONFIG")"
-if [ -f "$STARSHIP_CONFIG" ] && [ ! -L "$STARSHIP_CONFIG" ]; then
-    echo "Backing up existing starship.toml..."
-    mv "$STARSHIP_CONFIG" "${STARSHIP_CONFIG}.bak"
-fi
+backup_if_exists "$STARSHIP_CONFIG"
 ln -sf "$REPO_DIR/starship.toml" "$STARSHIP_CONFIG"
 
 echo "Setup complete! Please restart your terminal."

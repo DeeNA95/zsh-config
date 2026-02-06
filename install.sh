@@ -7,6 +7,44 @@ STARSHIP_CONFIG="$HOME/.config/starship.toml"
 
 echo "Setting up Zsh configuration..."
 
+# 0. Check and install Zsh if not found
+check_and_install_zsh() {
+    if ! command -v zsh >/dev/null 2>&1; then
+        echo "Zsh not found. Installing..."
+        if command -v brew >/dev/null 2>&1; then
+            brew install zsh
+        elif command -v apt-get >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y zsh
+        elif command -v dnf >/dev/null 2>&1; then
+            sudo dnf install -y zsh
+        elif command -v pacman >/dev/null 2>&1; then
+            sudo pacman -S --noconfirm zsh
+        else
+            echo "Error: No supported package manager found to install Zsh. Please install it manually."
+            exit 1
+        fi
+    else
+        echo "Zsh is already installed."
+    fi
+}
+
+set_default_shell() {
+    CURRENT_SHELL=$(basename "$SHELL")
+    if [ "$CURRENT_SHELL" != "zsh" ]; then
+        echo "Changing default shell to Zsh..."
+        if command -v chsh >/dev/null 2>&1; then
+            sudo chsh -s "$(which zsh)" "$USER"
+        else
+            echo "Warning: 'chsh' not found. Please manually set Zsh as your default shell."
+        fi
+    else
+        echo "Zsh is already the default shell."
+    fi
+}
+
+check_and_install_zsh
+set_default_shell
+
 # 1. Clone if not already there (for the VM use case)
 if [ ! -d "$REPO_DIR" ]; then
     echo "Cloning repository..."
